@@ -716,6 +716,11 @@
   function begin() {
     // startApp이 기존 앱을 위해 DOMContentLoaded를 다시 보내므로 한 번만 시작한다.
     if (begun) return; begun = true;
+    // 다른 사이트 안(iframe)에서는 열지 않는다: 몰래 끼워 넣고 버튼을 누르게 하는 공격(클릭재킹) 방지.
+    // GitHub Pages는 X-Frame-Options 헤더를 줄 수 없어 페이지가 직접 막는다.
+    var framed = true;
+    try { framed = window.top !== window.self; } catch (error) { framed = true; }
+    if (framed) { showGate('보안을 위해 다른 사이트 안에서는 열 수 없어요. 주소창에 직접 입력해 열어 주세요.', null, null, true); return; }
     if (!cfg.clientId || !cfg.spreadsheetId) { showGate('설정이 비어 있어요: OAuth 클라이언트 ID와 시트 ID가 필요해요.', null, null, true); return; }
     function attempt() {
       showGate('Google 계정으로 로그인해 주세요. 로그인은 이 기기에서 유지되고, 1시간마다 "로그인 연장"을 한 번 눌러 이어 써요.', 'Google 계정으로 열기', function () {
