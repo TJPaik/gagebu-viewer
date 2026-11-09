@@ -405,7 +405,8 @@
   function requestToken() {
     return waitForGis().then(function () {
       return new Promise(function (resolve, reject) {
-        if (!tokenClient) tokenClient = google.accounts.oauth2.initTokenClient({ client_id: cfg.clientId, scope: SCOPES.join(' '), callback: function () {} });
+        // include_granted_scopes:false — 예전에 이 앱에 허락했던 더 넓은 권한(읽기 전용 시절의 "모든 시트 보기")이 토큰에 섞이지 않게 한다.
+        if (!tokenClient) tokenClient = google.accounts.oauth2.initTokenClient({ client_id: cfg.clientId, scope: SCOPES.join(' '), include_granted_scopes: false, callback: function () {} });
         tokenClient.callback = function (resp) {
           if (resp.error) { reject(new Error(resp.error_description || resp.error)); return; }
           if (!google.accounts.oauth2.hasGrantedAllScopes.apply(null, [resp].concat(SCOPES.slice(1)))) { reject(new Error('요청한 권한을 모두 허용해야 쓸 수 있어요.')); return; }
