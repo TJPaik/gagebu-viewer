@@ -335,9 +335,12 @@
   var SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/drive.file'];
   var TABS = ['내역', '_가져오기', '카드/통장', '분류', '_가계부관리'];
   var SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets/';
-  // 가계부 사본·토큰은 기기에 남기지 않는다: 같은 주소(github.io)를 쓰는 다른 페이지가 읽을 수 없게,
-  // 기존 앱이 쓰는 빠른 표시용 사본(ledgerRows·ledgerAccountData)은 저장하지 않고 토큰은 메모리에만 둔다.
+  // 가계부 사본은 기기에 남기지 않는다: 같은 주소(tjpaik.github.io)를 쓰는 다른 페이지가 읽을 수 없게,
+  // 기존 앱이 쓰는 빠른 표시용 사본(ledgerRows·ledgerAccountData)은 저장하지 않는다.
+  // 토큰은 이 탭의 sessionStorage에만 둔다: 새로고침해도 만료(약 1시간) 전까지 다시 로그인하지 않고,
+  // 탭을 닫으면 사라지며 다른 탭(같은 주소의 다른 페이지 포함)에서는 읽을 수 없다. 권한은 고른 파일 하나뿐이다.
   var PRIVATE_KEYS = /^ledger(Rows|AccountData)/;
+  var TOKEN_KEY = 'gagebuViewerToken:v1';
   var token = null, tokenExpires = 0, tokenClient = null, email = '', sheetProps = null, appStarted = false;
 
   // ---- 시작 화면 -------------------------------------------------------------
@@ -374,6 +377,15 @@
     } catch (error) {}
   }
   function tokenValid() { return token && Date.now() < tokenExpires; }
+  function saveToken() { try { sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ token: token, expires: tokenExpires })); } catch (error) {} }
+  function clearToken() { token = null; tokenExpires = 0; try { sessionStorage.removeItem(TOKEN_KEY); } catch (error) {} }
+  function restoreToken() {
+    try {
+      var saved = JSON.parse(sessionStorage.getItem(TOKEN_KEY) || 'null');
+      if (saved && typeof saved.token === 'string' && saved.expires > Date.now() + 60000) { token = saved.token; tokenExpires = saved.expires; }
+      else sessionStorage.removeItem(TOKEN_KEY);
+    } catch (error) {}
+  }
   function waitFor(check, label) {
     return new Promise(function (resolve, reject) {
       var started = Date.now();
@@ -394,6 +406,7 @@
           if (resp.error) { reject(new Error(resp.error_description || resp.error)); return; }
           if (!google.accounts.oauth2.hasGrantedAllScopes.apply(null, [resp].concat(SCOPES.slice(1)))) { reject(new Error('요청한 권한을 모두 허용해야 쓸 수 있어요.')); return; }
           token = resp.access_token; tokenExpires = Date.now() + ((Number(resp.expires_in) || 3600) - 120) * 1000;
+          saveToken();
           resolve(token);
         };
         tokenClient.error_callback = function (err) {
@@ -416,7 +429,7 @@
     });
   }
   function logout() {
-    var t = token; token = null; tokenExpires = 0;
+    var t = token; clearToken();
     try { Object.keys(localStorage).forEach(function (k) { if (PRIVATE_KEYS.test(k)) localStorage.removeItem(k); }); } catch (error) {}
     function done() { window.location.reload(); }
     if (t && window.google && google.accounts && google.accounts.oauth2) google.accounts.oauth2.revoke(t, done); else done();
@@ -429,7 +442,7 @@
       var headers = Object.assign({ Authorization: 'Bearer ' + t }, options.body ? { 'Content-Type': 'application/json' } : {});
       return fetch(url, { method: options.method || 'GET', headers: headers, body: options.body ? JSON.stringify(options.body) : undefined });
     }).then(function (res) {
-      if (res.status === 401) { token = null; tokenExpires = 0; return request(url, options); }
+      if (res.status === 401) { clearToken(); return request(url, options); }
       if (res.status === 403 || res.status === 404) {
         var err = new Error('이 계정으로는 가계부 시트에 접근할 수 없어요. 시트를 공유받은 계정인지, 파일을 선택했는지 확인해 주세요.');
         err.noAccess = true; throw err;
@@ -672,10 +685,13 @@
     if (begun) return; begun = true;
     if (!cfg.clientId || !cfg.spreadsheetId) { showGate('설정이 비어 있어요: OAuth 클라이언트 ID와 시트 ID가 필요해요.', null, null, true); return; }
     function attempt() {
-      showGate('열 때마다 Google 로그인을 한 번 눌러 주세요(기기에 로그인 정보를 남기지 않아요).', 'Google 계정으로 열기', function () {
+      showGate('Google 계정으로 로그인해 주세요. 같은 탭에서는 새로고침해도 약 1시간 동안 로그인이 유지돼요.', 'Google 계정으로 열기', function () {
         requestToken().then(connect).catch(function (error) { showGate(error.message, '다시 시도', attempt, true); });
       });
     }
+    restoreToken();
+    // 같은 탭에서 새로고침한 경우: 저장된 토큰으로 바로 연결한다(만료·권한 문제면 로그인 화면으로).
+    if (tokenValid()) { connect().catch(function (error) { clearToken(); showGate(error.message, '다시 로그인', attempt, true); }); return; }
     attempt();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', begin); else begin();

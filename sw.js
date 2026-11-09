@@ -1,5 +1,5 @@
 // 앱 화면 파일만 저장한다(오프라인에서도 화면이 열리게). 가계부 데이터(Sheets API·Google 로그인 응답)는 절대 저장하지 않는다.
-var CACHE = 'gagebu-viewer-v127-1794220143537';
+var CACHE = 'gagebu-viewer-v127-1794221023462';
 var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (event) {
