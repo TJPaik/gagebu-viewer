@@ -532,7 +532,7 @@
       if (ok) return;
       return new Promise(function (resolve) {
         function attempt() {
-          showGate('처음 한 번은 가계부 파일을 직접 골라 주세요. 이 앱은 고른 파일 하나만 읽고 쓸 수 있어요. (휴대폰에서 선택창이 안 되면 PC에서 같은 계정으로 한 번 고르면 휴대폰에서도 열려요.)', '가계부 파일 선택', function () {
+          showGate('처음 한 번은 가계부 파일을 직접 골라 주세요. 이 앱은 고른 파일 하나만 읽고 쓸 수 있어요. 선택창에 "API developer key is invalid" 같은 오류가 뜨면 브라우저가 서드파티 쿠키를 막고 있는 거예요. 잠시 허용하고 고른 뒤 다시 막아도 되고, 다른 기기(PC Chrome 등)에서 같은 계정으로 한 번 골라도 돼요.', '가계부 파일 선택', function () {
             pickFile().then(checkAccess).then(function (granted) {
               if (granted) resolve(); else showGate('선택한 파일에 접근할 수 없어요. 시트를 공유받은 계정인지 확인해 주세요.', '다시 선택', attempt, true);
             }, function (error) { showGate(error.message, '다시 선택', attempt, true); });
